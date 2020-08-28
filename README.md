@@ -34,6 +34,9 @@ kubectl kaniko --context . --no-push --namespace default --kubeconfig ~/.kube/so
 # Login to remote registry
 docker login docker.io
 
+# Sort form
+kubectl kaniko -c . -d docker.io/some/image:latest
+
 # Use cache building
 kubectl kaniko --context . --destination docker.io/some/image:latest --cache-repo docker.io/some/image-cache
 
