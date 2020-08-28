@@ -1,7 +1,9 @@
-# kubectl kaniko plugin
+# kubectl-kaniko
 
-Simple kaniko wrapper for kubectl.
+Kaniko wrapper for kubectl.
 *(inspired by [GoogleContainerTools/kaniko#1289](https://github.com/GoogleContainerTools/kaniko/pull/1289))*
+
+This plugin allows you to simple build your dockerfiles directly in your Kubernetes cluster.
 
 ## Installation
 
