@@ -38,7 +38,7 @@ docker login docker.io
 kubectl kaniko -c . -d docker.io/some/image:latest
 
 # Use cache building
-kubectl kaniko --context . --destination docker.io/some/image:latest --cache-repo docker.io/some/image-cache
+kubectl kaniko --context . --destination docker.io/some/image:latest --cache-repo docker.io/some/cache
 
 # Build from stdin
 tar -cvf- . | kubectl kaniko --destination docker.io/some/image:latest --context tar://stdin
