@@ -7,6 +7,8 @@ kubeconfig=""
 generator=""
 node=""
 namespace=""
+digestfile=""
+imagenamewithdigestfile=""
 args="[ "
 while [ $# -gt 0 ]; do
   key="$1"
@@ -19,6 +21,24 @@ while [ $# -gt 0 ]; do
     ;;
   --context=*)
     context="${key##*=}"
+    shift
+    ;;
+  --digest-file)
+    digestfile="$2"
+    shift
+    shift
+    ;;
+  --digest-file=*)
+    digestfile="${key##*=}"
+    shift
+    ;;
+  --image-name-with-digest-file)
+    imagenamewithdigestfile="$2"
+    shift
+    shift
+    ;;
+  --image-name-with-digest-file=*)
+    imagenamewithdigestfile="${key##*=}"
     shift
     ;;
   --kubecontext)
@@ -55,12 +75,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+args+="\"--image-name-with-digest-file=/dev/termination-log\""
 if [ -z "$context" ]; then
-  args+="\"--context=\" ]"
+  args+=" ]"
 elif [ -d "$context" ]; then
-  args+="\"--context=tar://stdin\" ]"
+  args+=", \"--context=tar://stdin\" ]"
 else
-  args+="\"--context=$context\" ]"
+  args+=", \"--context=$context\" ]"
 fi
 
 image="gcr.io/kaniko-project/executor:v1.0.0"
@@ -90,6 +111,8 @@ overrides="$(
         "name": "kaniko",
         "stdin": true,
         "stdinOnce": true,
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
         "args": $args,
         "volumeMounts": $volumemounts
       }
@@ -123,4 +146,11 @@ if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
     kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
 else
     kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
+fi
+
+if [ $? -eq 0 ] && ( [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ] ) then
+  imagenamewithdigest=$(kubectl get pod "$name" -o go-template='{{ range .status.containerStatuses }}{{ with .state.terminated.message }}{{ . }}{{ end }}{{ end }}')
+  digest=${imagenamewithdigest##*@}
+  [ -z "$digestfile" ] || printf "%s" "$digest" > "$digestfile"
+  [ -z "$imagenamewithdigestfile" ] || printf "%s\n" "$imagenamewithdigest" > "$imagenamewithdigestfile"
 fi

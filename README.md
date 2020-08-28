@@ -42,6 +42,9 @@ kubectl kaniko -c . -d docker.io/some/image:latest
 # Use cache building
 kubectl kaniko --context . --destination docker.io/some/image:latest --cache-repo docker.io/some/cache
 
+# Save image name and digest to file
+kubectl kaniko --context . --destination docker.io/some/image:latest --digest-file /tmp/digest --image-name-with-digest-file /tmp/image
+
 # Build from stdin
 tar -cvf- . | kubectl kaniko --destination docker.io/some/image:latest --context tar://stdin
 ```
