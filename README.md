@@ -23,12 +23,18 @@ kubectl kaniko [args]
 # Show all kaniko commands
 kubectl kaniko --help
 
-# Specify namespace and build from current directory
-kubectl kaniko --context=. --namespace builds  --no-push
+# Build from current directory
+kubectl kaniko --context . --no-push
+
+# Specify namespace and kubeconfig
+kubectl kaniko --context . --no-push --namespace default --kubeconfig ~/.kube/someconfig
+
+# Login to remote registry
+docker login docker.io
 
 # Use cache building
-kubectl kaniko --context=. --destination docker.io/some/image:latest --cache-repo docker.io/some/image-cache
+kubectl kaniko --context . --destination docker.io/some/image:latest --cache-repo docker.io/some/image-cache
 
 # Build from stdin
-tar -cvf- . | kubectl kaniko --destination docker.io/some/image:latest --context=tar://stdin
+tar -cvf- . | kubectl kaniko --destination docker.io/some/image:latest --context tar://stdin
 ```
