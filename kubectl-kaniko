@@ -111,7 +111,7 @@ if [ -n "$context" ] && ( [ ! -d "$context" ] && [ "$context" != "tar://stdin" ]
   exit 1
 fi
 
-trap "kubectl delete "secret/$name" "pod/$name" --wait=false $kubecontext $kubeconfig $namespace 2>/dev/null" EXIT
+trap "kubectl delete "secret/$name" "pod/$name" --wait=false $kubecontext $kubeconfig $namespace 2>/dev/null" EXIT INT TERM
 
 if [ -f ~/.docker/config.json ]; then
   kubectl create secret generic "$name" --from-file ~/.docker/config.json
