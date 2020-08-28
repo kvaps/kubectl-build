@@ -1,10 +1,12 @@
 #!/bin/sh
+set -e
 
 context=""
 kubeconfig=""
 generator=""
 node=""
 namespace=""
+args+="[ "
 while [ $# -gt 0 ]; do
   key="$1"
 
@@ -30,17 +32,52 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   *)
-    args+=" $1"
+    args+="\"$1\", "
     shift
     ;;
   esac
 done
+args+="\"--context=tar://stdin\" ]"
 
 image="gcr.io/kaniko-project/executor:v1.0.0"
-pod="kaniko-$(env LC_ALL=C tr -dc a-z0-9 < /dev/urandom | head -c 6)"
+name="kaniko-$(env LC_ALL=C tr -dc a-z0-9 < /dev/urandom | head -c 6)"
+
+if [ -f ~/.docker/config.json ]; then
+  volumes="[{\"name\":\"docker-config\", \"secret\":{\"secretName\":\"$name\"}}]"
+  volumemounts="[{\"name\":\"docker-config\", \"mountPath\":\"/kaniko/.docker/\"}]"
+else
+  volumes="[]"
+  volumemounts="[]"
+fi
+
+overrides="$(
+  cat <<EOT
+{
+  "spec": {
+    "nodeName": "$node",
+    "hostPID": true,
+    "hostNetwork": true,
+    "containers": [
+      {
+        "securityContext": {
+          "privileged": true
+        },
+        "image": "$image",
+        "name": "kaniko",
+        "stdin": true,
+        "stdinOnce": true,
+        "args": $args,
+        "volumeMounts": $volumemounts
+      }
+    ],
+    "volumes": $volumes
+  }
+}
+EOT
+)"
 
 # Support Kubectl <1.18
-m=$(kubectl version --client -o yaml | awk -F'[ :"]+' '$2 == "minor" {print $3+0}' )
+m=$(kubectl version --client -o yaml | awk -F'[ :"]+' '$2 == "minor" {print $3+0}')
 if [ "$m" -lt 18 ]; then
   generator="--generator=run-pod/v1"
 fi
@@ -50,6 +87,12 @@ if [ -z "$context" ]; then
   exit 1
 fi
 
-echo "spawning \"$pod\""
-trap "kubectl delete pod --wait=false $pod $kubecontext $kubeconfig $namespace 2>/dev/null" EXIT
-tar --record-size=1M --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | kubectl run --image "$image" --restart=Never --image="$image" -i "$pod" $generator $kubecontext $kubeconfig $namespace -- $args --context=tar://stdin
+trap "kubectl delete "secret/$name" "pod/$name" --wait=false $kubecontext $kubeconfig $namespace 2>/dev/null" EXIT
+
+if [ -f ~/.docker/config.json ]; then
+  kubectl create secret generic "$name" --from-file ~/.docker/config.json
+fi
+
+echo "spawning \"$name\""
+tar --record-size=1M --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | \
+  kubectl run --image "$image" --restart=Never --overrides="$overrides" --image="$image" -i "$name" $generator $kubecontext $kubeconfig $namespace
