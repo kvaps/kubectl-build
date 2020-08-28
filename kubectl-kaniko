@@ -1,0 +1,55 @@
+#!/bin/sh
+
+context=""
+kubeconfig=""
+generator=""
+node=""
+namespace=""
+while [ $# -gt 0 ]; do
+  key="$1"
+
+  case $key in
+  -c | --context)
+    context="$2"
+    shift
+    shift
+    ;;
+  --kubecontext)
+    kubecontext="--context $2"
+    shift
+    shift
+    ;;
+  --kubeconfig)
+    kubeconfig="--kubeconfig $2"
+    shift
+    shift
+    ;;
+  -n | --namespace)
+    namespace="--namespace $2"
+    shift
+    shift
+    ;;
+  *)
+    args+=" $1"
+    shift
+    ;;
+  esac
+done
+
+image="gcr.io/kaniko-project/executor:v1.0.0"
+pod="kaniko-$(env LC_ALL=C tr -dc a-z0-9 < /dev/urandom | head -c 6)"
+
+# Support Kubectl <1.18
+m=$(kubectl version --client -o yaml | awk -F'[ :"]+' '$2 == "minor" {print $3+0}' )
+if [ "$m" -lt 18 ]; then
+  generator="--generator=run-pod/v1"
+fi
+
+if [ -z "$context" ]; then
+  echo "Error: You must provide --context"
+  exit 1
+fi
+
+echo "spawning \"$pod\""
+trap "kubectl delete pod --wait=false $pod $kubecontext $kubeconfig $namespace 2>/dev/null" EXIT
+tar --record-size=1M --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | kubectl run --image "$image" --restart=Never --image="$image" -i "$pod" $generator $kubecontext $kubeconfig $namespace -- $args --context=tar://stdin
