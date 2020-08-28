@@ -17,9 +17,17 @@ while [ $# -gt 0 ]; do
     shift
     shift
     ;;
+  --context=*)
+    context="${key##*=}"
+    shift
+    ;;
   --kubecontext)
     kubecontext="--context $2"
     shift
+    shift
+    ;;
+  --kubecontext=*)
+    kubecontext="--context=${key##*=}"
     shift
     ;;
   --kubeconfig)
@@ -27,9 +35,17 @@ while [ $# -gt 0 ]; do
     shift
     shift
     ;;
+  --kubeconfig=*)
+    kubeconfig="--kubeconfig=${key##*=}"
+    shift
+    ;;
   -n | --namespace)
     namespace="--namespace $2"
     shift
+    shift
+    ;;
+  --namespace=*)
+    namespace="--namespace=${key##*=}"
     shift
     ;;
   *)
