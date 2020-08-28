@@ -2,6 +2,7 @@
 set -e
 
 context=""
+kubecontext=""
 kubeconfig=""
 generator=""
 node=""
@@ -37,7 +38,12 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
-args+="\"--context=tar://stdin\" ]"
+
+if [ -n "$context" ]; then
+  args+="\"--context=tar://stdin\" ]"
+else
+  args="$(echo "$args" | awk '1' RS=', \n') ]"
+fi
 
 image="gcr.io/kaniko-project/executor:v1.0.0"
 name="kaniko-$(env LC_ALL=C tr -dc a-z0-9 < /dev/urandom | head -c 6)"
@@ -82,11 +88,6 @@ if [ "$m" -lt 18 ]; then
   generator="--generator=run-pod/v1"
 fi
 
-if [ -z "$context" ]; then
-  echo "Error: You must provide --context"
-  exit 1
-fi
-
 trap "kubectl delete "secret/$name" "pod/$name" --wait=false $kubecontext $kubeconfig $namespace 2>/dev/null" EXIT
 
 if [ -f ~/.docker/config.json ]; then
@@ -94,5 +95,9 @@ if [ -f ~/.docker/config.json ]; then
 fi
 
 echo "spawning \"$name\""
-tar --record-size=1M --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | \
-  kubectl run --image "$image" --restart=Never --overrides="$overrides" --image="$image" -i "$name" $generator $kubecontext $kubeconfig $namespace
+if [ -n "$context" ]; then
+  tar --record-size=1M --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | \
+    kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
+else
+    kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
+fi
