@@ -75,7 +75,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-args+="\"--image-name-with-digest-file=/dev/termination-log\""
+
+if [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ]; then
+  args+="\"--image-name-with-digest-file=/dev/termination-log\""
+else
+  args+="\"--image-name-with-digest-file=\""
+fi
+
 if [ -z "$context" ]; then
   args+=" ]"
 elif [ -d "$context" ]; then
@@ -148,8 +154,13 @@ else
     kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
 fi
 
+# Retrieve digest file
 if [ $? -eq 0 ] && ( [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ] ) then
   imagenamewithdigest=$(kubectl get pod "$name" -o go-template='{{ range .status.containerStatuses }}{{ with .state.terminated.message }}{{ . }}{{ end }}{{ end }}')
+  if [ -z "$imagenamewithdigest" ]; then
+    echo "Error: termination message is missing" >&2
+    exit 2
+  fi
   digest=${imagenamewithdigest##*@}
   [ -z "$digestfile" ] || printf "%s" "$digest" > "$digestfile"
   [ -z "$imagenamewithdigestfile" ] || printf "%s\n" "$imagenamewithdigest" > "$imagenamewithdigestfile"
