@@ -1,51 +1,49 @@
-# kubectl-kaniko
+# kubectl build
+*(formerly known as **kubectl-kaniko**)*
 
-Kaniko plugin for kubectl.
-*(inspired by [GoogleContainerTools/kaniko#1289](https://github.com/GoogleContainerTools/kaniko/pull/1289))*
+Kubectl build mimics the kaniko executor, but performs building on your Kubernetes cluster side.  
+This allows you to simply build your local dockerfiles remotely without leaving your cozy environment.
 
-The Kaniko wrapper for kubectl mimics the kaniko executor, but performs any build tasks remotely on your Kubernetes cluster.
-This allows you to simply run a remote build of your dockerfiles without leaving your cozy environment.
-
-![demo](https://gist.githubusercontent.com/kvaps/7d823b727a87d244d1f25deb5ff592da/raw/1c4c3e5d9c7a0666ba44631250411b4d9123c802/kubectl-kaniko.gif)
+![demo](https://gist.githubusercontent.com/kvaps/7d823b727a87d244d1f25deb5ff592da/raw/13062e62deb269f9385bc1c995382a589c34f04b/kubectl-build.gif)
 
 ## Installation
 
 ```bash
-curl -LO https://github.com/kvaps/kubectl-kaniko/raw/master/kubectl-kaniko
-chmod +x ./kubectl-kaniko
-sudo mv ./kubectl-kaniko /usr/local/bin/kubectl-kaniko
+curl -LO https://github.com/kvaps/kubectl-build/raw/master/kubectl-build
+chmod +x ./kubectl-build
+sudo mv ./kubectl-build /usr/local/bin/kubectl-build
 ```
 
 ## Usage
 
 ```bash
-kubectl kaniko [args]
+kubectl build [args]
 ```
 
 ## Examples
 
 ```bash
 # Show all kaniko commands
-kubectl kaniko --help
+kubectl build --help
 
 # Build from current directory
-kubectl kaniko --context . --no-push
+kubectl build --context . --no-push
 
 # Specify namespace and kubeconfig
-kubectl kaniko --context . --no-push --namespace default --kubeconfig ~/.kube/someconfig
+kubectl build --context . --no-push --namespace default --kubeconfig ~/.kube/someconfig
 
 # Login to remote registry
 docker login docker.io
 
 # Short form
-kubectl kaniko -c . -d docker.io/some/image:latest
+kubectl build -c . -d docker.io/some/image:latest
 
 # Use cache building
-kubectl kaniko --context . --destination docker.io/some/image:latest --cache --cache-repo docker.io/some/cache
+kubectl build --context . --destination docker.io/some/image:latest --cache --cache-repo docker.io/some/cache
 
 # Save image name and digest to file
-kubectl kaniko --context . --destination docker.io/some/image:latest --digest-file /tmp/digest --image-name-with-digest-file /tmp/image
+kubectl build --context . --destination docker.io/some/image:latest --digest-file /tmp/digest --image-name-with-digest-file /tmp/image
 
 # Build from stdin
-tar -cvf- . | kubectl kaniko --destination docker.io/some/image:latest --context tar://stdin
+tar -cvf- . | kubectl build --destination docker.io/some/image:latest --context tar://stdin
 ```
