@@ -148,7 +148,7 @@ fi
 
 echo "spawning \"$name\""
 if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
-  tar --record-size=1M --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | \
+  tar --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' -C "$context" -czf - . | \
     kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
 else
     kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator $kubecontext $kubeconfig $namespace
