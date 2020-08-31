@@ -69,25 +69,24 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   *)
-    args+="\"$1\", "
+    args="$args\"$1\", "
     shift
     ;;
   esac
 done
 
-
 if [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ]; then
-  args+="\"--image-name-with-digest-file=/dev/termination-log\""
+  args="$args\"--image-name-with-digest-file=/dev/termination-log\""
 else
-  args+="\"--image-name-with-digest-file=\""
+  args="$args\"--image-name-with-digest-file=\""
 fi
 
 if [ -z "$context" ]; then
-  args+=" ]"
+  args="$args ]"
 elif [ -d "$context" ]; then
-  args+=", \"--context=tar://stdin\" ]"
+  args="$args, \"--context=tar://stdin\" ]"
 else
-  args+=", \"--context=$context\" ]"
+  args="$args, \"--context=$context\" ]"
 fi
 
 image="gcr.io/kaniko-project/executor:v1.0.0"
