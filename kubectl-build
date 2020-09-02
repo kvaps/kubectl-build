@@ -133,7 +133,7 @@ fi
 # Support bsdtar as well
 m=$(tar --version | awk '{print $1; exit}')
 if [ "$m" != "bsdtar" ]; then
-  tarf(){ tar --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' "$@"; }
+  tarf(){ tar --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@"; }
 fi
 
 if [ -n "$context" ] && ( [ ! -d "$context" ] && [ "$context" != "tar://stdin" ] ); then
