@@ -155,7 +155,7 @@ fi
 
 # Retrieve digest file
 if [ $? -eq 0 ] && ( [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ] ) then
-  imagenamewithdigest=$(kubectl get pod "$name" -o go-template='{{ range .status.containerStatuses }}{{ with .state.terminated.message }}{{ . }}{{ end }}{{ end }}')
+  imagenamewithdigest=$(kubectl get pod "$name" $kubecontext $kubeconfig $namespace -o go-template='{{ range .status.containerStatuses }}{{ with .state.terminated.message }}{{ . }}{{ end }}{{ end }}')
   if [ -z "$imagenamewithdigest" ]; then
     echo "Error: termination message is missing" >&2
     exit 2
