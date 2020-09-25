@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 set -e
-tarf(){ tar "$@"; }
+tarf() { tar "$@"; }
 kubectl=kubectl
 context=""
 generator=""
@@ -87,7 +87,7 @@ else
 fi
 
 image="gcr.io/kaniko-project/executor:v1.0.0"
-name="kaniko-$(env LC_ALL=C tr -dc a-z0-9 < /dev/urandom | head -c 6)"
+name="kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)"
 
 if [ -f ~/.docker/config.json ]; then
   volumes="[{\"name\":\"docker-config\", \"secret\":{\"secretName\":\"$name\"}}]"
@@ -101,13 +101,8 @@ overrides="$(
   cat <<EOT
 {
   "spec": {
-    "hostPID": true,
-    "hostNetwork": true,
     "containers": [
       {
-        "securityContext": {
-          "privileged": true
-        },
         "image": "$image",
         "name": "kaniko",
         "stdin": true,
@@ -133,10 +128,10 @@ fi
 # Support bsdtar as well
 m=$(tar --version | awk '{print $1; exit}')
 if [ "$m" != "bsdtar" ]; then
-  tarf(){ tar --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@"; }
+  tarf() { tar --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@"; }
 fi
 
-if [ -n "$context" ] && ( [ ! -d "$context" ] && [ "$context" != "tar://stdin" ] ); then
+if [ -n "$context" ] && ([ ! -d "$context" ] && [ "$context" != "tar://stdin" ]); then
   echo "Error: $context: Cannot open: Not a directory" >&2
   exit 1
 fi
@@ -149,20 +144,20 @@ fi
 
 echo "spawning \"$name\""
 if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
-  tarf -C "$context" -czf - . | \
+  tarf -C "$context" -czf - . |
     $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
 else
-    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
+  $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
 fi
 
 # Retrieve digest file
-if [ $? -eq 0 ] && ( [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ] ) then
+if [ $? -eq 0 ] && ([ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ]); then
   imagenamewithdigest=$($kubectl get pod "$name" -o go-template='{{ range .status.containerStatuses }}{{ with .state.terminated.message }}{{ . }}{{ end }}{{ end }}')
   if [ -z "$imagenamewithdigest" ]; then
     echo "Error: termination message is missing" >&2
     exit 2
   fi
   digest=${imagenamewithdigest##*@}
-  [ -z "$digestfile" ] || printf "%s" "$digest" > "$digestfile"
-  [ -z "$imagenamewithdigestfile" ] || printf "%s\n" "$imagenamewithdigest" > "$imagenamewithdigestfile"
+  [ -z "$digestfile" ] || printf "%s" "$digest" >"$digestfile"
+  [ -z "$imagenamewithdigestfile" ] || printf "%s\n" "$imagenamewithdigest" >"$imagenamewithdigestfile"
 fi
