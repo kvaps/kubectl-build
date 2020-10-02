@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 set -e
-tarf() { tar "$@"; }
+DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker/config.json}
 kubectl=kubectl
 context=""
 generator=""
@@ -89,14 +89,6 @@ fi
 image="gcr.io/kaniko-project/executor:v1.2.0"
 name="kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)"
 
-if [ -f ~/.docker/config.json ]; then
-  volumes="[{\"name\":\"docker-config\", \"secret\":{\"secretName\":\"$name\"}}]"
-  volumemounts="[{\"name\":\"docker-config\", \"mountPath\":\"/kaniko/.docker/\"}]"
-else
-  volumes="[]"
-  volumemounts="[]"
-fi
-
 overrides="$(
   cat <<EOT
 {
@@ -109,11 +101,9 @@ overrides="$(
         "stdinOnce": true,
         "terminationMessagePath": "/dev/termination-log",
         "terminationMessagePolicy": "File",
-        "args": $args,
-        "volumeMounts": $volumemounts
+        "args": $args
       }
-    ],
-    "volumes": $volumes
+    ]
   }
 }
 EOT
@@ -128,7 +118,21 @@ fi
 # Support bsdtar as well
 m=$(tar --version | awk '{print $1; exit}')
 if [ "$m" != "bsdtar" ]; then
-  tarf() { tar --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@"; }
+  tarf() {
+    if [ -f "$DOCKER_CONFIG" ]; then
+      tar -P --transform "s|^${DOCKER_CONFIG}|../.docker/config.json|" --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@" "$DOCKER_CONFIG"
+    else
+      tar -P --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@"
+    fi
+  }
+else
+  tarf() {
+    if [ -f "$DOCKER_CONFIG" ]; then
+      tar -P -s "|^${DOCKER_CONFIG}|../.docker/config.json|" "$@" "$DOCKER_CONFIG"
+    else
+      tar -P "$@"
+    fi
+  }
 fi
 
 if [ -n "$context" ] && ([ ! -d "$context" ] && [ "$context" != "tar://stdin" ]); then
@@ -136,11 +140,7 @@ if [ -n "$context" ] && ([ ! -d "$context" ] && [ "$context" != "tar://stdin" ])
   exit 1
 fi
 
-trap "EC=\$?; $kubectl delete secret/$name pod/$name --wait=false 2>/dev/null || true; exit \$EC" EXIT INT TERM
-
-if [ -f ~/.docker/config.json ]; then
-  $kubectl create secret generic "$name" --from-file ~/.docker/config.json
-fi
+trap "EC=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$EC" EXIT INT TERM
 
 echo "spawning \"$name\""
 if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
