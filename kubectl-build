@@ -103,7 +103,9 @@ overrides="$(
         "terminationMessagePolicy": "File",
         "args": $args
       }
-    ]
+    ],
+    "automountServiceAccountToken": false,
+    "enableServiceLinks": false
   }
 }
 EOT
