@@ -6,6 +6,8 @@ context=""
 generator=""
 digestfile=""
 imagenamewithdigestfile=""
+nodefaultctx=0
+nodefaultns=0
 args="[ "
 while [ $# -gt 0 ]; do
   key="$1"
@@ -39,11 +41,13 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   --kubecontext)
+    nodefaultctx=1
     kubectl="$kubectl --context $2"
     shift
     shift
     ;;
   --kubecontext=*)
+    nodefaultctx=1
     kubectl="$kubectl --context=${key##*=}"
     shift
     ;;
@@ -57,11 +61,13 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   -n | --namespace)
+    nodefaultns=1
     kubectl="$kubectl --namespace $2"
     shift
     shift
     ;;
   --namespace=*)
+    nodefaultns=1
     kubectl="$kubectl --namespace=${key##*=}"
     shift
     ;;
@@ -71,6 +77,10 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
+
+# Set the default context and namespace to avoid situations where the user switch them during the build process
+[ "$nodefaultctx" = 1 ] || kubectl="$kubectl --context=$(kubectl config current-context)"
+[ "$nodefaultns" = 1 ] || kubectl="$kubectl --namespace=$(kubectl config view --minify --output 'jsonpath={.contexts..namespace}')"
 
 if [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ]; then
   args="$args\"--image-name-with-digest-file=/dev/termination-log\""
@@ -147,9 +157,9 @@ trap "EC=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit
 echo "spawning \"$name\""
 if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
   tarf -C "$context" -czf - . |
-    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
+    $kubectl run --image "$image" --rm --restart=Never --overrides="$overrides" -i "$name" $generator
 else
-  $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
+  $kubectl run --image "$image" --rm --restart=Never --overrides="$overrides" -i "$name" $generator
 fi
 
 # Retrieve digest file
