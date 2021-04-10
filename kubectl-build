@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 set -e
-DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker/config.json}
+export DOCKER_CONFIG=${KUBECTL_BUILD_DOCKER_CONFIG:-${DOCKER_CONFIG:-$HOME/.docker/config.json}}
+export KUBECONFIG="${KUBECTL_BUILD_KUBECONFIG:-$KUBECONFIG}"
 kubectl=kubectl
 context=""
 generator=""
@@ -79,8 +80,8 @@ while [ $# -gt 0 ]; do
 done
 
 # Set the default context and namespace to avoid situations where the user switch them during the build process
-[ "$nodefaultctx" = 1 ] || kubectl="$kubectl --context=$(kubectl config current-context)"
-[ "$nodefaultns" = 1 ] || kubectl="$kubectl --namespace=$(kubectl config view --minify --output 'jsonpath={.contexts..namespace}')"
+[ "$nodefaultctx" = 1 ] || kubectl="$kubectl --context=${KUBECTL_BUILD_CONTEXT:-$(kubectl config current-context)}"
+[ "$nodefaultns" = 1 ] || kubectl="$kubectl --namespace=${KUBECTL_BUILD_NAMESPACE:-$(kubectl config view --minify --output 'jsonpath={.contexts..namespace}')}"
 
 if [ -n "$digestfile" ] || [ -n "$imagenamewithdigestfile" ]; then
   args="$args\"--image-name-with-digest-file=/dev/termination-log\""
@@ -96,12 +97,13 @@ else
   args="$args, \"--context=$context\" ]"
 fi
 
-image="gcr.io/kaniko-project/executor:v1.5.1"
-name="kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)"
+image="${KUBECTL_BUILD_IMAGE:-gcr.io/kaniko-project/executor:v1.5.1}"
+name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
 
 overrides="$(
   cat <<EOT
 {
+  "metadata": ${KUBECTL_BUILD_METADATA_OVERRIDES:-"{}"},
   "spec": {
     "containers": [
       {
@@ -152,14 +154,16 @@ if [ -n "$context" ] && ([ ! -d "$context" ] && [ "$context" != "tar://stdin" ])
   exit 1
 fi
 
-trap "EC=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$EC" EXIT INT TERM
+if [ "$KUBECTL_BUILD_KEEP_POD" != "true" ]; then
+  trap "EC=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$EC" EXIT INT TERM
+fi
 
 echo "spawning \"$name\""
 if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
   tarf -C "$context" -czf - . |
-    $kubectl run --image "$image" --rm --restart=Never --overrides="$overrides" -i "$name" $generator
+    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
 else
-  $kubectl run --image "$image" --rm --restart=Never --overrides="$overrides" -i "$name" $generator
+  $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
 fi
 
 # Retrieve digest file

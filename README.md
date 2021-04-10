@@ -56,3 +56,20 @@ kubectl build --context . --destination docker.io/some/image:latest --digest-fil
 # Build from stdin
 tar -cvf- . | kubectl build --destination docker.io/some/image:latest --context tar://stdin
 ```
+
+## Extra configuration
+
+While standard behavior of kubectl-build plugin intend to repeat kaniko executor options. The additional configuration can be specified by setting environment variables.
+
+This may be useful for both having permanent configuration and setting CI-systems.
+
+| Enivroment Variable                | Description                                                                    | Default value                    |
+|------------------------------------|--------------------------------------------------------------------------------|----------------------------------|
+| `KUBECTL_BUILD_CONTEXT`            | Kubernetes context for creating pod (may be overriden by `--kubecontext`)      | current context                  |
+| `KUBECTL_BUILD_DOCKER_CONFIG`      | Path to dockerconfig file to forward                                           | `~/.docker/config.json`          |
+| `KUBECTL_BUILD_IMAGE`              | Kaniko-executor image                                                          | `gcr.io/kaniko-project/executor` |
+| `KUBECTL_BUILD_KEEP_POD`           | If set to `true` do not delete pod after finising process                      | `false`                          |
+| `KUBECTL_BUILD_KUBECONFIG`         | Path to kubeconfig file for creating pods (may be overriden by `--kubeconfig`) | kubectl defaults                 |
+| `KUBECTL_BUILD_METADATA_OVERRIDES` | Json patch to override metadata for creating pods                              | `{}`                             |
+| `KUBECTL_BUILD_NAME_OVERRIDE`      | Name for creating pod                                                          | `kaniko-rand6n`                  |
+| `KUBECTL_BUILD_NAMESPACE`          | Kubernetes namespace for creating pod (may be overriden by `--namespace`)      | current namespace                |
