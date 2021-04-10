@@ -1,5 +1,4 @@
-# kubectl build
-*(formerly known as **kubectl-kaniko**)*
+# Kubectl build
 
 Kubectl build mimics the kaniko executor, but performs building on your Kubernetes cluster side.  
 This allows you to simply build your local dockerfiles remotely without leaving your cozy environment.
