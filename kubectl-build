@@ -97,7 +97,7 @@ else
   args="$args, \"--context=$context\" ]"
 fi
 
-image="${KUBECTL_BUILD_IMAGE:-gcr.io/kaniko-project/executor:v1.5.2}"
+image="${KUBECTL_BUILD_IMAGE:-gcr.io/kaniko-project/executor:v1.6.0}"
 name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
 
 overrides="$(
