@@ -46,6 +46,9 @@ docker login docker.io
 # Short form
 kubectl build -c . -d docker.io/some/image:latest
 
+# Run debug shell
+kubectl build -c . --no-push --debug
+
 # Use cache building
 kubectl build --context . --destination docker.io/some/image:latest --cache --cache-repo docker.io/some/cache
 

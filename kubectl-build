@@ -3,7 +3,13 @@ set -e
 export DOCKER_CONFIG=${KUBECTL_BUILD_DOCKER_CONFIG:-${DOCKER_CONFIG:-$HOME/.docker/config.json}}
 export KUBECONFIG="${KUBECTL_BUILD_KUBECONFIG:-$KUBECONFIG}"
 kubectl=kubectl
+version=1.6.0
+image="${KUBECTL_BUILD_IMAGE:-ghcr.io/kvaps/kaniko-executor:v1.6.0}"
+name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
 context=""
+debug="false"
+tty="false"
+usetar="false"
 generator=""
 digestfile=""
 imagenamewithdigestfile=""
@@ -14,6 +20,10 @@ while [ $# -gt 0 ]; do
   key="$1"
 
   case $key in
+  -v | --version)
+    echo "kubectl-build $version"
+    exit 0
+    ;;
   -c | --context)
     context="$2"
     shift
@@ -39,6 +49,14 @@ while [ $# -gt 0 ]; do
     ;;
   --image-name-with-digest-file=*)
     imagenamewithdigestfile="${key##*=}"
+    shift
+    ;;
+  --debug)
+    debug="true"
+    shift
+    ;;
+  --debug=*)
+    debug="${key##*=}"
     shift
     ;;
   --kubecontext)
@@ -89,16 +107,23 @@ else
   args="$args\"--image-name-with-digest-file=\""
 fi
 
-if [ -z "$context" ]; then
-  args="$args ]"
-elif [ -d "$context" ]; then
-  args="$args, \"--context=tar://stdin\" ]"
+if [ -d "$context" ] || [ "$context" = "tar://stdin" ]; then
+  args="$args, \"--context=tar://stdin\""
+  usetar=true
+  tty=false
 else
-  args="$args, \"--context=$context\" ]"
+  args="$args, \"--context=$context\""
+  usetar=false
+  if [ $debug = true ]; then
+    tty=true
+  fi
 fi
 
-image="${KUBECTL_BUILD_IMAGE:-gcr.io/kaniko-project/executor:v1.6.0}"
-name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
+if [ "$debug" = true ]; then
+  args="$args, \"--debug\" ]"
+else
+  args="$args ]"
+fi
 
 overrides="$(
   cat <<EOT
@@ -109,6 +134,7 @@ overrides="$(
       {
         "image": "$image",
         "name": "kaniko",
+        "tty": $tty,
         "stdin": true,
         "stdinOnce": true,
         "terminationMessagePath": "/dev/termination-log",
@@ -129,39 +155,46 @@ if [ "$m" -lt 18 ]; then
   generator="--generator=run-pod/v1"
 fi
 
-# Support bsdtar as well
-m=$(tar --version | awk '{print $1; exit}')
-if [ "$m" != "bsdtar" ]; then
-  tarf() {
+tarf() {
+  # Support bsdtar as well
+  m=$(tar --version | awk '{print $1; exit}')
+  if [ "$m" != "bsdtar" ]; then
     if [ -f "$DOCKER_CONFIG" ]; then
       tar -P --transform "s|^${DOCKER_CONFIG}|../.docker/config.json|" --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@" "$DOCKER_CONFIG"
     else
       tar -P --record-size=100K --checkpoint=1 --checkpoint-action='ttyout=Sending build context to Kaniko %{r}T\r' --exclude-ignore=.dockerignore "$@"
     fi
-  }
-else
-  tarf() {
+  else
     if [ -f "$DOCKER_CONFIG" ]; then
       tar -P -s "|^${DOCKER_CONFIG}|../.docker/config.json|" "$@" "$DOCKER_CONFIG"
     else
       tar -P "$@"
     fi
-  }
-fi
-
-if [ -n "$context" ] && ([ ! -d "$context" ] && [ "$context" != "tar://stdin" ]); then
-  echo "Error: $context: Cannot open: Not a directory" >&2
-  exit 1
-fi
+  fi
+}
 
 if [ "$KUBECTL_BUILD_KEEP_POD" != "true" ]; then
-  trap "EC=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$EC" EXIT INT TERM
+  trap "ec=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$ec" EXIT INT TERM
 fi
 
 echo "spawning \"$name\""
-if [ -n "$context" ] && [ "$context" != "tar://stdin" ]; then
-  tarf -C "$context" -czf - . |
-    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
+if [ "$usetar" = "true" ]; then
+  pidfile=$(mktemp -u)
+  (
+    tarf -C "$context" -czf - .
+    if [ "$debug" = true ]; then
+      sh -c 'echo $PPID' > "$pidfile"
+      trap 'stty icanon echo' EXIT
+      stty -icanon -echo
+      cat
+    fi
+  ) | (
+    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator || ec=$?
+    if [ "$debug" = true ]; then
+      kill $(cat "$pidfile")
+    fi
+    exit $ec
+  )
 else
   $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
 fi
