@@ -169,20 +169,27 @@ tarf() {
 }
 
 if [ "$KUBECTL_BUILD_KEEP_POD" != "true" ]; then
-  trap "EC=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$EC" EXIT INT TERM
+  trap "ec=\$?; $kubectl delete pod "$name" --wait=false 2>/dev/null || true; exit \$ec" EXIT INT TERM
 fi
 
 echo "spawning \"$name\""
 if [ "$usetar" = "true" ]; then
+  pidfile=$(mktemp -u)
   (
     tarf -C "$context" -czf - .
     if [ "$debug" = true ]; then
-      trap "stty icanon echo" EXIT
+      sh -c 'echo $PPID' > "$pidfile"
+      trap 'stty icanon echo' EXIT
       stty -icanon -echo
       cat
     fi
-  ) |
-    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
+  ) | (
+    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator || ec=$?
+    if [ "$debug" = true ]; then
+      kill $(cat "$pidfile")
+    fi
+    exit $ec
+  )
 else
   $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
 fi
