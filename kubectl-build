@@ -191,7 +191,7 @@ if [ "$usetar" = "true" ]; then
   ) | (
     $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator || ec=$?
     if [ "$debug" = true ]; then
-      kill $(cat "$pidfile")
+      kill $(cat "$pidfile") 2>/dev/null
     fi
     exit $ec
   )
