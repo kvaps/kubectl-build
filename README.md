@@ -10,7 +10,7 @@ This allows you to simply build your local dockerfiles remotely without leaving 
 using [krew](https://krew.sigs.k8s.io/):
 
 <pre>
-kubectl krew index add kvaps <a href="https://github.com/kvaps/krew-index">https://github.com/kvaps/krew-index</a>
+kubectl krew index add kvaps https://github.com/kvaps/krew-index
 kubectl krew install kvaps/build
 </pre>
 
