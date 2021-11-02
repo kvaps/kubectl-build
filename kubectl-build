@@ -3,7 +3,7 @@ set -e
 export DOCKER_CONFIG=${KUBECTL_BUILD_DOCKER_CONFIG:-${DOCKER_CONFIG:-$HOME/.docker/config.json}}
 export KUBECONFIG="${KUBECTL_BUILD_KUBECONFIG:-$KUBECONFIG}"
 kubectl=kubectl
-version=1.6.1
+version=1.6.2
 image="${KUBECTL_BUILD_IMAGE:-ghcr.io/kvaps/kaniko-executor:v1.6.0}"
 name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
 context=""
@@ -187,14 +187,15 @@ if [ "$usetar" = "true" ]; then
       sh -c 'echo $PPID' > "$pidfile"
       trap 'stty icanon echo' EXIT
       stty -icanon -echo
-      cat
+      cat 2>/dev/null
     fi
   ) | (
-    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator || ec=$?
+    $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" --leave-stdin-open=true $generator
     if [ "$debug" = true ]; then
       kill $(cat "$pidfile") 2>/dev/null
     fi
-    exit $ec
+    ec=$($kubectl get pod "$name" -o 'jsonpath={.status.containerStatuses[0].state.terminated.exitCode}')
+    exit ${ec:-1}
   )
 else
   $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
