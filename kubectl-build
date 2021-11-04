@@ -3,7 +3,7 @@ set -e
 export DOCKER_CONFIG=${KUBECTL_BUILD_DOCKER_CONFIG:-${DOCKER_CONFIG:-$HOME/.docker/config.json}}
 export KUBECONFIG="${KUBECTL_BUILD_KUBECONFIG:-$KUBECONFIG}"
 kubectl=kubectl
-version=1.7.0
+version=1.7.1
 image="${KUBECTL_BUILD_IMAGE:-ghcr.io/kvaps/kaniko-executor:v1.7.0}"
 name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
 context=""
@@ -194,8 +194,8 @@ if [ "$usetar" = "true" ]; then
     if [ "$debug" = true ]; then
       kill $(cat "$pidfile") 2>/dev/null
     fi
-    ec=$($kubectl get pod "$name" -o 'jsonpath={.status.containerStatuses[0].state.terminated.exitCode}')
-    exit ${ec:-1}
+    $kubectl get pod "$name" -w -o 'go-template={{with .status.containerStatuses}}{{range .}}{{with .state.terminated}}{{index . "exitCode"}}{{"\n"}}{{.exitCode.err}}{{end}}{{end}}{{end}}' 2>/dev/null \
+      | { read ec; exit $ec; }
   )
 else
   $kubectl run --image "$image" --restart=Never --overrides="$overrides" -i "$name" $generator
