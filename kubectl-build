@@ -3,7 +3,7 @@ set -e
 export DOCKER_CONFIG=${KUBECTL_BUILD_DOCKER_CONFIG:-${DOCKER_CONFIG:-$HOME/.docker/config.json}}
 export KUBECONFIG="${KUBECTL_BUILD_KUBECONFIG:-$KUBECONFIG}"
 kubectl=kubectl
-version=1.7.1
+version=1.7.2
 image="${KUBECTL_BUILD_IMAGE:-ghcr.io/kvaps/kaniko-executor:v1.7.0}"
 name="${KUBECTL_BUILD_NAME_OVERRIDE:-kaniko-$(env LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)}"
 context=""
@@ -185,8 +185,8 @@ if [ "$usetar" = "true" ]; then
     tarf -C "$context" -czf - .
     if [ "$debug" = true ]; then
       sh -c 'echo $PPID' > "$pidfile"
-      trap 'stty icanon echo' EXIT
-      stty -icanon -echo
+      trap "stty '$(stty -g)'" EXIT
+      stty -icanon -ctlecho -iexten -isig -echo
       cat 2>/dev/null
     fi
   ) | (
